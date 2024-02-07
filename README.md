@@ -1,4 +1,4 @@
-# Simulated Annealing Implementation for Image Optimization in the CUDA/PyCUDA environment.
+# Simulated Annealing Implementation for Image Optimization in the CUDA/PyCUDA environment
 
 ## Introduction
 This project is developed for the Parallel Algorithms course at the faculty.
