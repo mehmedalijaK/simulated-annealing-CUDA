@@ -80,10 +80,10 @@ def generate_random(n, width):
 
 mod = SourceModule("""
     #include <math.h>
-    
+
     __global__ void copy_image_to_shared_memory(unsigned char *image, unsigned char *shared_image, 
     int* energy, int width, int height) {
-    
+
         long idx = threadIdx.y * width + threadIdx.x;
         long i  = idx * 3;
         shared_image[i] = image[i];
@@ -91,44 +91,44 @@ mod = SourceModule("""
         shared_image[i+2] = image[i+2];
 
         __syncthreads();
-     
+
         int right = 0;
         int down = 0;
-        
+
         // Check if indices are within bounds
-        
+
        if ( threadIdx.x < width - 1 ) {
             right = abs(shared_image[i] - shared_image[i + 3]) + 
             abs(shared_image[i + 1] - shared_image[i + 4]) + 
             abs(shared_image[i + 2] - shared_image[i + 5]);
        }
-        
-        
+
+
         if( threadIdx.y < width - 1 ) {
             down = abs(shared_image[i] - shared_image[i + 3*width]) + 
             abs(shared_image[i + 1] - shared_image[i + 1 + 3*width]) + 
             abs(shared_image[i + 2] - shared_image[i + 2 + 3*width]);
         }
-            
+
         atomicAdd(energy, right);  // Use atomicAdd to safely increment energy
         atomicAdd(energy, down); 
     }
-    
+
     __global__ void swap(unsigned char *shared_image, char *random, int width, 
      char *x_y, float temp, float* random_values, int energy){
-     
+
         __shared__ int sharedFinalEnergy[1024];
         __shared__ unsigned char *share_image_block;
         share_image_block = shared_image;
-        
+
         printf("%d", share_image_block[1]);
-        
+
         long idx = (threadIdx.y * 12 + threadIdx.x);
         // printf("%d ", idx);
-        
+
         long x = random[idx*2];
         long y = random[idx*2+1];
-        
+
         int energyNew = 0;
         int energySwitched = 0;
 
@@ -137,12 +137,12 @@ mod = SourceModule("""
         int iP1 = x_y[threadIdx.y * 4+2]*width*3 + x_y[threadIdx.y * 4+3]*3;
 
         if( !(x < 0 || y < 0 || x >= width || y>= width) ){
-        
+
             if(y < width - 1) {
                 energyNew += abs(shared_image[i] - shared_image[i + 3]) + 
                 abs(shared_image[i + 1] - shared_image[i + 4]) + 
                 abs(shared_image[i + 2] - shared_image[i + 5]);
-                
+
                 if(i == iP && i + 3 ==iP1){
                     energySwitched += abs(shared_image[iP1] - shared_image[iP]) + 
                     abs(shared_image[iP1 + 1] - shared_image[iP+1]) + 
@@ -173,12 +173,12 @@ mod = SourceModule("""
                     abs(shared_image[i + 2] - shared_image[i + 5]);
                 }
             }
-        
+
             if(x < width - 1){
                 energyNew += abs(shared_image[i] - shared_image[i + 3*width]) + 
                 abs(shared_image[i + 1] - shared_image[i + 1 + 3*width]) + 
                 abs(shared_image[i + 2] - shared_image[i + 2 + 3*width]);
-                
+
                 if(i == iP && i + 3*width == iP1){
                     energySwitched +=  abs(shared_image[iP1] - shared_image[iP]) + 
                     abs(shared_image[iP1 + 1] - shared_image[iP + 1]) + 
@@ -209,23 +209,23 @@ mod = SourceModule("""
                     abs(shared_image[i + 2] - shared_image[i + 2 + 3*width]);
                 }
             }
-            
+
             // results -> (newEnergy, 
-        
+
         }
-        
+
         //shared
-        
+
         atomicAdd(&sharedFinalEnergy[threadIdx.y*4 ], energyNew);  
         atomicAdd(&sharedFinalEnergy[threadIdx.y*4 + 1], energySwitched);  
         sharedFinalEnergy[threadIdx.y*4 + 2] = iP;  
         sharedFinalEnergy[threadIdx.y*4 + 3] = iP1;
-        
+
        __syncthreads(); 
-       
+
        //printf(" x: %d y: %d Energy: %d Energy switched: %d i: %d ip: %d ip1: %d idx: %d |", x, y, energyNew, energySwitched, i, 
         //iP, iP1, idx);
-        
+
         if(threadIdx.x == 0 && threadIdx.y == 0){
             int bestLowEnergy = 5000000;
             int i1G = 0;
@@ -240,27 +240,26 @@ mod = SourceModule("""
             }
             // 20 22    20 - 22 = -2
             __syncthreads(); 
-            
+
             printf("%f ", random_values[i1G%12]);
             printf("%f", exp2f(-bestLowEnergy / temp));
             if(bestLowEnergy < 0 || random_values[i1G%12] < exp2f(-bestLowEnergy / temp)) {
-                
+
             }
-            
+
             printf("|%d %d %d %f|", bestLowEnergy, i1G, i2G, temp);
         }
-        
-        
-        
-        
+
+
+
+
         // if idx = 0 {... matrix = [10101010]} energija 1 x1,y1 x2,y2
-        
+
     }
-    
-    
+
+
 """)
 
-# __global__ for kernel functions
 
 image = np.random.randint(0, 2, (5, 5, 3), dtype=np.uint8)
 shared_image = np.zeros((5, 5, 3), dtype=np.uint8)
@@ -301,13 +300,3 @@ print(random_uniform_values)
 swap(image_gpu, random_gpu, np.int32(image.shape[1]), random_xy_gpy, np.float32(temp), random_uniform_values_gpu,
      np.int32(energy), block=(12, 8, 1), grid=(5, 5, 1))
 
-# No need to copy energy back to the host
-
-# print((shared_image == image).all())
-#
-# print("Profesor: ")
-# print(energy_fun(image))
-# print(image)
-#
-# print("Ja: ")
-# print(energy[0])  # Access the value in the array
